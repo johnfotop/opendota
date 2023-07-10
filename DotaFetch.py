@@ -28,7 +28,7 @@ try:
     heroes = response.json()
 
     cur.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='Heronames'")
-    table_exists = cur.fetchone()
+    table_exists = cur.fetchone()[0]
     if table_exists:
         print("Table 'Heronames' already exists. Insert statements will not be executed.")
     else:
@@ -57,7 +57,7 @@ try:
     matches = response.json()
 
     cur.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='Match_IDs'")
-    table_exists = cur.fetchone()
+    table_exists = cur.fetchone()[0]
     if table_exists:
         print('Table \'Match_IDs\' already exists. Insert statements will not be executed.')
     else:
