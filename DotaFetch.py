@@ -38,7 +38,7 @@ except sqlite3.Error as e:
 print("Moving on to call2 for retrieving all turbo match IDs")
 
 # you can change the limit argument in the call bellow to make it faster. with 50 games it will take about 30 seconds to run
-call2 = 'https://api.opendota.com/api/players/197497174/matches?limit=20&game_mode=23&significant=0'
+call2 = 'https://api.opendota.com/api/players/197497174/matches?limit=30&game_mode=23&significant=0'
 
 try:
     response = requests.get(call2)
@@ -114,37 +114,34 @@ for matchid in matchids:
             dire_score = details['dire_score']
             radiant_win = details['radiant_win']
             players_data = details['players']
-            count = 0
             accounts = []
             heroes = []
-            slots = []
             for player in players_data:
                 account_id = player['account_id']
                 hero_id = player['hero_id']
                 player_slot = player['player_slot']
-                count = count + 1
                 accounts.append(account_id)
                 heroes.append(hero_id)
-                slots.append(player_slot)
 
 
-            cur.execute('''INSERT OR IGNORE INTO Matches (Radiant_score, Dire_score, Radiant_win)
-            VALUES (?, ?, ?)''', (radiant_score, dire_score, radiant_win))
+        cur.execute('''UPDATE Matches 
+                    SET Radiant_score = ?, Dire_score = ?, Radiant_win = ?
+                    WHERE Match_id = ?''', (radiant_score, dire_score, radiant_win, matchid[0]))
 
 
-            cur.execute('''INSERT OR IGNORE INTO Picks (Match_id, Pick_slot_1, Pick_slot_2, Pick_slot_3, Pick_slot_4,
-                Pick_slot_5, Pick_slot_6, Pick_slot_7, Pick_slot_8, Pick_slot_9, Pick_slot_10)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                 ?)''', (matchid[0], heroes[0], heroes[1], heroes[2], heroes[3], heroes[4], heroes[5], heroes[6], heroes[7],
-                        heroes[8], heroes[9]))
+        cur.execute('''INSERT OR IGNORE INTO Picks (Match_id, Pick_slot_1, Pick_slot_2, Pick_slot_3, Pick_slot_4,
+            Pick_slot_5, Pick_slot_6, Pick_slot_7, Pick_slot_8, Pick_slot_9, Pick_slot_10)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+             ?)''', (matchid[0], heroes[0], heroes[1], heroes[2], heroes[3], heroes[4], heroes[5], heroes[6], heroes[7],
+                    heroes[8], heroes[9]))
 
-            cur.execute('''INSERT OR IGNORE INTO Players (Match_id, Player_slot_1, Player_slot_2, Player_slot_3, 
-                Player_slot_4, Player_slot_5, Player_slot_6, Player_slot_7, Player_slot_8, Player_slot_9, Player_slot_10)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                 ?)''', (matchid[0], accounts[0], accounts[1], accounts[2], accounts[3], accounts[4], accounts[5],
-                        accounts[6],  accounts[7], accounts[8], accounts[9]))
+        cur.execute('''INSERT OR IGNORE INTO Players (Match_id, Player_slot_1, Player_slot_2, Player_slot_3, 
+            Player_slot_4, Player_slot_5, Player_slot_6, Player_slot_7, Player_slot_8, Player_slot_9, Player_slot_10)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+             ?)''', (matchid[0], accounts[0], accounts[1], accounts[2], accounts[3], accounts[4], accounts[5],
+                    accounts[6],  accounts[7], accounts[8], accounts[9]))
 
-            conn.commit()
+        conn.commit()
 
     except requests.exceptions.RequestException as e:
         print("An error occurred while making the HTTP request:", e)
@@ -163,11 +160,12 @@ conn.close()
 # 2) removed counts from last loops
 # 3) changed columns first letters to Uppercase
 # 4) reworked database schema and removed player_slot_i columns and relevant variables
-# 5) moved the last 2 executes inside the "details" for loop (NEED TO STUDY THIS)
+# 5) used an Update statement (instead of insert) to fix faulty data filling in the last 3 columns of the "Matches" table
+
 
 # THINGS TO DO:
-# 1) somehow make CREATE and INSERT statements easier for Players table
-# 2) Decide between INSERT OR IGNORE VS INSERT OR REPLACE STATEMENTS
+# 1) make CREATE and INSERT statements easier for large tables
+# 2) read about Update syntax
 # 3) write some retrieval scripts
 
-# MATCHES TABLE IS PROBLEMATIC
+
