@@ -19,14 +19,14 @@ try:
         print('Table \'Heronames\' already exists. Insert statements will not be executed.')
     else:
         cur.execute('''CREATE TABLE IF NOT EXISTS Heronames (
-            hero_id PRIMARY KEY, 
-            hero_name TEXT
+            Hero_id PRIMARY KEY, 
+            Hero_name TEXT
         )''')
 
         for list_element in heroes:
             hero_id = list_element['id']
             hero_name = list_element['localized_name']
-            cur.execute('''INSERT INTO Heronames (hero_id, hero_name)
+            cur.execute('''INSERT INTO Heronames (Hero_id, Hero_name)
                 VALUES (?, ?)''', (hero_id, hero_name))
         conn.commit()
         print("Data inserted successfully in 'Heronames' table!")
@@ -38,42 +38,44 @@ except sqlite3.Error as e:
 print("Moving on to call2 for retrieving all turbo match IDs")
 
 # you can change the limit argument in the call bellow to make it faster. with 50 games it will take about 30 seconds to run
-call2 = 'https://api.opendota.com/api/players/197497174/matches?limit=50&game_mode=23&significant=0'
+call2 = 'https://api.opendota.com/api/players/197497174/matches?limit=20&game_mode=23&significant=0'
 
 try:
     response = requests.get(call2)
     response.raise_for_status()
     matches = response.json()
-    cur.execute('''CREATE TABLE IF NOT EXISTS Match_IDs (
-        match_id PRIMARY KEY, 
-        game_mode INTEGER
+    cur.execute('''CREATE TABLE IF NOT EXISTS Matches (
+        Match_id PRIMARY KEY, 
+        Game_mode INTEGER,
+        Radiant_score INTEGER, 
+        Dire_score INTEGER, 
+        Radiant_win INTEGER       
     )''')
 
     for list_element in matches:
         match_id = list_element['match_id']
         game_mode = list_element['game_mode']
-        cur.execute('''INSERT OR IGNORE INTO Match_IDs (match_id, game_mode)
+        cur.execute('''INSERT OR IGNORE INTO Matches (Match_id, Game_mode)
         VALUES (?, ?)''', (match_id, game_mode))
     conn.commit()
-    print("Data inserted (or ignored :) successfully in 'Match_IDs' table!")
+    print("Data inserted (or ignored :) successfully in 'Matches' table!")
 except requests.exceptions.RequestException as e:
     print("An error occurred while making the HTTP request:", e)
 except sqlite3.Error as e:
     print("An error occurred while interacting with the database:", e)
 
-print("Moving on to call3 for retrieving individual match details from match IDs")
+print("Moving on to call3 for retrieving individual match details from Match IDs")
 
 baseurl = 'https://api.opendota.com/api/matches/'
 
 # making the final call url
-cur.execute("SELECT match_id FROM Match_IDs ORDER BY match_id DESC")
+cur.execute("SELECT Match_id FROM Matches ORDER BY Match_id DESC")
 
 # Fetch all the rows returned by the query (as a list of tuples)
 matchids = cur.fetchall()
 
-hero_id = None # we used this variable in the first table
-# e as success  flag
-e = None
+hero_id = None  # we used this variable in the first table
+e = None        # we use e as success  flag
 for matchid in matchids:
     call3 = baseurl + str(matchid[0])
     try:
@@ -81,46 +83,31 @@ for matchid in matchids:
         response.raise_for_status()
         details = response.json()
 
-        cur.execute('''CREATE TABLE IF NOT EXISTS Game_Details (
-            id INTEGER PRIMARY KEY , 
-            match_id INTEGER UNIQUE, 
-            radiant_score INTEGER, 
-            dire_score INTEGER, 
-            radiant_win INTEGER
+        cur.execute('''CREATE TABLE IF NOT EXISTS Picks (
+            Match_id PRIMARY KEY,
+            Pick_slot_1 INTEGER,
+            Pick_slot_2 INTEGER,
+            Pick_slot_3 INTEGER,
+            Pick_slot_4 INTEGER,
+            Pick_slot_5 INTEGER,
+            Pick_slot_6 INTEGER,
+            Pick_slot_7 INTEGER,
+            Pick_slot_8 INTEGER,
+            Pick_slot_9 INTEGER,
+            Pick_slot_10 INTEGER
         )''')
         cur.execute('''CREATE TABLE IF NOT EXISTS Players (
-            id INTEGER PRIMARY KEY, 
-            match_id INTEGER UNIQUE, 
-            player_slot_1 INTEGER, 
-            account_id_1 INTEGER, 
-            hero_id_1 INTEGER,
-            player_slot_2 INTEGER, 
-            account_id_2 INTEGER, 
-            hero_id_2 INTEGER,
-            player_slot_3 INTEGER, 
-            account_id_3 INTEGER, 
-            hero_id_3 INTEGER,
-            player_slot_4 INTEGER, 
-            account_id_4 INTEGER, 
-            hero_id_4 INTEGER,
-            player_slot_5 INTEGER, 
-            account_id_5 INTEGER, 
-            hero_id_5 INTEGER,
-            player_slot_6 INTEGER, 
-            account_id_6 INTEGER, 
-            hero_id_6 INTEGER,
-            player_slot_7 INTEGER, 
-            account_id_7 INTEGER, 
-            hero_id_7 INTEGER,
-            player_slot_8 INTEGER, 
-            account_id_8 INTEGER, 
-            hero_id_8 INTEGER, 
-            player_slot_9 INTEGER, 
-            account_id_9 INTEGER, 
-            hero_id_9 INTEGER,
-            player_slot_10 INTEGER, 
-            account_id_10 INTEGER, 
-            hero_id_10 INTEGER           
+            Match_id PRIMARY KEY,
+            Player_slot_1 INTEGER, 
+            Player_slot_2 INTEGER, 
+            Player_slot_3 INTEGER, 
+            Player_slot_4 INTEGER, 
+            Player_slot_5 INTEGER, 
+            Player_slot_6 INTEGER, 
+            Player_slot_7 INTEGER, 
+            Player_slot_8 INTEGER, 
+            Player_slot_9 INTEGER, 
+            Player_slot_10 INTEGER          
         )''')
         for key in details:
             radiant_score = details['radiant_score']
@@ -140,37 +127,47 @@ for matchid in matchids:
                 heroes.append(hero_id)
                 slots.append(player_slot)
 
-        cur.execute('''INSERT OR IGNORE INTO Players (match_id, account_id_1, hero_id_1, player_slot_1, account_id_2, hero_id_2,
-            player_slot_2, account_id_3, hero_id_3, player_slot_3, account_id_4, hero_id_4, player_slot_4, account_id_5, hero_id_5,
-            player_slot_5, account_id_6, hero_id_6, player_slot_6, account_id_7, hero_id_7, player_slot_7, account_id_8, hero_id_8,
-            player_slot_8, account_id_9, hero_id_9, player_slot_9, account_id_10, hero_id_10, player_slot_10)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-             ?)''', (matchid[0],  accounts[0], heroes[0], slots[0], accounts[1], heroes[1], slots[1], \
-                        accounts[2], heroes[2], slots[2], accounts[3], heroes[3], slots[3], \
-                        accounts[4], heroes[4], slots[4], accounts[5], heroes[5], slots[5], \
-                        accounts[6], heroes[6], slots[6], accounts[7], heroes[7], slots[7], \
-                        accounts[8], heroes[8], slots[8], accounts[9], heroes[9], slots[9]))
 
-        cur.execute('''INSERT OR IGNORE INTO Game_Details (match_id, radiant_score, dire_score, radiant_win)
-            VALUES (?, ?, ?, ?)''', (matchid[0], radiant_score, dire_score, radiant_win))
+            cur.execute('''INSERT OR IGNORE INTO Matches (Radiant_score, Dire_score, Radiant_win)
+            VALUES (?, ?, ?)''', (radiant_score, dire_score, radiant_win))
 
-        conn.commit()
+
+            cur.execute('''INSERT OR IGNORE INTO Picks (Match_id, Pick_slot_1, Pick_slot_2, Pick_slot_3, Pick_slot_4,
+                Pick_slot_5, Pick_slot_6, Pick_slot_7, Pick_slot_8, Pick_slot_9, Pick_slot_10)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                 ?)''', (matchid[0], heroes[0], heroes[1], heroes[2], heroes[3], heroes[4], heroes[5], heroes[6], heroes[7],
+                        heroes[8], heroes[9]))
+
+            cur.execute('''INSERT OR IGNORE INTO Players (Match_id, Player_slot_1, Player_slot_2, Player_slot_3, 
+                Player_slot_4, Player_slot_5, Player_slot_6, Player_slot_7, Player_slot_8, Player_slot_9, Player_slot_10)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                 ?)''', (matchid[0], accounts[0], accounts[1], accounts[2], accounts[3], accounts[4], accounts[5],
+                        accounts[6],  accounts[7], accounts[8], accounts[9]))
+
+            conn.commit()
 
     except requests.exceptions.RequestException as e:
         print("An error occurred while making the HTTP request:", e)
     except sqlite3.Error as e:
         print("An error occurred while interacting with the database:", e)
 if e is None:
-    print("Data inserted (or ignored :) successfully in 'Game_Details' table!")
-    print("Data inserted (or ignored :) successfully in 'Player_Details' table!")
+    print("Data inserted (or ignored :) successfully in 'Picks' table!")
+    print("Data inserted (or ignored :) successfully in 'Players' table!")
 
 
 cur.close()
 conn.close()
 
+# CHANGES:
+# 1) changed table names (for eg Match_IDs to Matches, Game_Details to Picks, Player_details to Players)
+# 2) removed counts from last loops
+# 3) changed columns first letters to Uppercase
+# 4) reworked database schema and removed player_slot_i columns and relevant variables
+# 5) moved the last 2 executes inside the "details" for loop (NEED TO STUDY THIS)
+
 # THINGS TO DO:
 # 1) somehow make CREATE and INSERT statements easier for Players table
 # 2) Decide between INSERT OR IGNORE VS INSERT OR REPLACE STATEMENTS
 # 3) write some retrieval scripts
+
+# MATCHES TABLE IS PROBLEMATIC
