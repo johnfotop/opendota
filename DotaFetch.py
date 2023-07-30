@@ -1,7 +1,8 @@
 import sqlite3
 import requests
+import time
 
-conn = sqlite3.connect('../dota.sqlite')
+conn = sqlite3.connect('dota.sqlite')
 cur = conn.cursor()
 
 heroes_call = 'https://api.opendota.com/api/heroes'
@@ -14,7 +15,8 @@ try:
 
     cur.execute(
         "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='Heronames'")
-    table_exists = cur.fetchone()[0]  # if table_exists: is true for table_exists /= 0 and false for table_exists = 0
+    # count : how many rows in sqlite_master table match the condition
+    table_exists = cur.fetchone()[0]
     if table_exists:
         print('Table \'Heronames\' already exists. Insert statements will not be executed.')
     else:
@@ -37,8 +39,7 @@ except sqlite3.Error as sql_error:
 
 print("Moving on to all matches call for retrieving all turbo match IDs")
 
-
-all_matches = 'https://api.opendota.com/api/players/197497174/matches?limit=30&game_mode=23&significant=0'
+all_matches = 'https://api.opendota.com/api/players/197497174/matches?limit=10&game_mode=23&significant=0'
 
 try:
     response = requests.get(all_matches)
@@ -49,7 +50,7 @@ try:
         Game_mode INTEGER,
         Radiant_score INTEGER, 
         Dire_score INTEGER, 
-        Radiant_win INTEGER       
+        Radiant_win INTEGER    
     )''')
 
     for list_element in matches:
@@ -58,7 +59,7 @@ try:
         cur.execute('''INSERT OR IGNORE INTO Matches (Match_id, Game_mode)
         VALUES (?, ?)''', (match_id, game_mode))
     conn.commit()
-    print("Data inserted (or ignored :) successfully in 'Matches' table!")
+    print("Data from 2nd call inserted (or ignored :) successfully in 'Matches' table!")
 except requests.exceptions.RequestException as sql_error:
     print("An error occurred while making the HTTP request:", sql_error)
 except sqlite3.Error as sql_error:
@@ -74,71 +75,56 @@ cur.execute("SELECT Match_id FROM Matches ORDER BY Match_id DESC")
 # Fetch all the rows returned by the query (as a list of tuples)
 matchids = cur.fetchall()
 
+#counter to follow how many matches we have retrieved
+count = 0
+
 hero_id = None  # we used this variable in the first table
-sql_error = None        # success flag
+sql_error = None  # we use e as success  flag
 for matchid in matchids:
-    indiv_matches_cal = baseurl + str(matchid[0])
+    indiv_matches_call = baseurl + str(matchid[0])
     try:
-        response = requests.get(indiv_matches_cal)
+        response = requests.get(indiv_matches_call)
         response.raise_for_status()
         details = response.json()
 
-        cur.execute('''CREATE TABLE IF NOT EXISTS Picks (
-            Match_id PRIMARY KEY,
-            Pick_slot_1 INTEGER,
-            Pick_slot_2 INTEGER,
-            Pick_slot_3 INTEGER,
-            Pick_slot_4 INTEGER,
-            Pick_slot_5 INTEGER,
-            Pick_slot_6 INTEGER,
-            Pick_slot_7 INTEGER,
-            Pick_slot_8 INTEGER,
-            Pick_slot_9 INTEGER,
-            Pick_slot_10 INTEGER
-        )''')
         cur.execute('''CREATE TABLE IF NOT EXISTS Players (
-            Match_id PRIMARY KEY,
-            Player_slot_1 INTEGER, 
-            Player_slot_2 INTEGER, 
-            Player_slot_3 INTEGER, 
-            Player_slot_4 INTEGER, 
-            Player_slot_5 INTEGER, 
-            Player_slot_6 INTEGER, 
-            Player_slot_7 INTEGER, 
-            Player_slot_8 INTEGER, 
-            Player_slot_9 INTEGER, 
-            Player_slot_10 INTEGER          
+            Account_id PRIMARY KEY      
         )''')
+
+        cur.execute('''CREATE TABLE IF NOT EXISTS Roster (
+            Match_id     INTEGER,
+            Account_id   INTEGER,
+            Hero_id      INTEGER,
+            Player_slot  INTEGER,
+            PRIMARY KEY (Match_id, Account_id, Hero_id )   
+        )''')
+
         radiant_score = details['radiant_score']
         dire_score = details['dire_score']
         radiant_win = details['radiant_win']
         players_data = details['players']
-        accounts = []
-        heroes = []
         for player in players_data:
             account_id = player['account_id']
             hero_id = player['hero_id']
             player_slot = player['player_slot']
-            accounts.append(account_id)
-            heroes.append(hero_id)
+            cur.execute('''INSERT OR IGNORE INTO Players (Account_id)
+                VALUES (?)''', (account_id,))
+            cur.execute('''INSERT OR IGNORE INTO Roster (Match_id, Account_id, Hero_id, Player_slot )
+                       VALUES (?,?,?,?)''', (matchid[0],account_id,hero_id,player_slot))
 
         cur.execute('''UPDATE Matches 
                     SET Radiant_score = ?, Dire_score = ?, Radiant_win = ?
                     WHERE Match_id = ?''', (radiant_score, dire_score, radiant_win, matchid[0]))
 
-        cur.execute('''INSERT OR IGNORE INTO Picks (Match_id, Pick_slot_1, Pick_slot_2, Pick_slot_3, Pick_slot_4,
-            Pick_slot_5, Pick_slot_6, Pick_slot_7, Pick_slot_8, Pick_slot_9, Pick_slot_10)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-             ?)''', (matchid[0], heroes[0], heroes[1], heroes[2], heroes[3], heroes[4], heroes[5], heroes[6], heroes[7],
-                    heroes[8], heroes[9]))
-
-        cur.execute('''INSERT OR IGNORE INTO Players (Match_id, Player_slot_1, Player_slot_2, Player_slot_3, 
-            Player_slot_4, Player_slot_5, Player_slot_6, Player_slot_7, Player_slot_8, Player_slot_9, Player_slot_10)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-             ?)''', (matchid[0], accounts[0], accounts[1], accounts[2], accounts[3], accounts[4], accounts[5],
-                    accounts[6],  accounts[7], accounts[8], accounts[9]))
-
         conn.commit()
+        time.sleep(1)
+        count = count + 1
+        print('Retrieved game number: ', count)
+
+    except KeyboardInterrupt:
+        print('')
+        print('Program interrupted by user...')
+        break
 
     except requests.exceptions.RequestException as sql_error:
         print("An error occurred while making the HTTP request:", sql_error)
@@ -148,22 +134,23 @@ if sql_error is None:
     print("Data inserted (or ignored :) successfully in 'Picks' table!")
     print("Data inserted (or ignored :) successfully in 'Players' table!")
 
-
 cur.close()
 conn.close()
 
+
 # CHANGES:
-# 1) changed table names (for e.g. Match_IDs to Matches, Game_Details to Picks, Player_details to Players)
-# 2) removed counts from last loops
-# 3) changed columns first letters to Uppercase
-# 4) reworked database schema and removed player_slot_i columns and relevant variables
-# 5) used an Update statement (instead of insert) to fix faulty data insertion in the last 3 columns of the "Matches"
-# table
-# 6) changed some variable names to be more explanatory (like call1 , call2 , call3 and error variables)
-# 7) removed unnecessary for loop to read json 1st level dictionaries
+# Adopted another schema for better and easier querying :
+# 1) changed "Players" table to just include 1 column with account_ids (no pick slots)
+# 2) reworked "Picks" table into "Roster" table so that each row represents one player slot of a specific match_id
+# 3) removed heroes list at last loop
+# 4) switched Insert statement for Roster table into INSERT OR IGNORE so as to avoid duplicating errors on
+# program rerun.
+# 5) implemented time.sleep(1) function so as to avoid flooding the API and keyboardinterrupt exceptions.
+# 6) Implemented counter and print message to follow which Match we are currently commiting
 
 
 # THINGS TO DO:
-# 1) put sleep time to not overwhelm API
-# 2) change database model because of bad querying functionality
-# 3)
+# 1) decide between INSERT OR INGORE and INSERT OR REPLACE statements depending on which is more efficient.
+# 2) might remove Account_id from PK of Roster table due to some account having Null values
+# 3) fix keyboardinterrupt not working properly
+# 4) use last Match_id fetched to resume retrieval from new entries
