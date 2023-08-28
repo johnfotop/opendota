@@ -1,2 +1,8 @@
+# IDE
 .idea
+
+# Build
+venv
+
+# Other
 dota.sqlite

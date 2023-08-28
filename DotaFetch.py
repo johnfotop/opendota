@@ -138,19 +138,4 @@ cur.close()
 conn.close()
 
 
-# CHANGES:
-# Adopted another schema for better and easier querying :
-# 1) changed "Players" table to just include 1 column with account_ids (no pick slots)
-# 2) reworked "Picks" table into "Roster" table so that each row represents one player slot of a specific match_id
-# 3) removed heroes list at last loop
-# 4) switched Insert statement for Roster table into INSERT OR IGNORE so as to avoid duplicating errors on
-# program rerun.
-# 5) implemented time.sleep(1) function so as to avoid flooding the API and keyboardinterrupt exceptions.
-# 6) Implemented counter and print message to follow which Match we are currently commiting
 
-
-# THINGS TO DO:
-# 1) decide between INSERT OR INGORE and INSERT OR REPLACE statements depending on which is more efficient.
-# 2) might remove Account_id from PK of Roster table due to some account having Null values
-# 3) fix keyboardinterrupt not working properly
-# 4) use last Match_id fetched to resume retrieval from new entries
